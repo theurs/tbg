@@ -1,0 +1,6 @@
+cfg.py
+__pycache__
+.venv
+test.py
+db/*
+logs/*

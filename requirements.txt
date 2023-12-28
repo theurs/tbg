@@ -1,0 +1,7 @@
+bs4
+gTTS
+prettytable
+Proxy-List-Scrapper
+pylatexenc
+SpeechRecognition
+telebot
