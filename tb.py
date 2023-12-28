@@ -20,6 +20,11 @@ import utils
 # Setting the working directory to the directory where the script is located
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
+if not os.path.exists('db'):
+    os.mkdir('db')
+if not os.path.exists('logs'):
+    os.mkdir('logs')
+
 
 bot = telebot.TeleBot(cfg.token, skip_pending=True)
 _bot_name = bot.get_me().username
