@@ -30,7 +30,7 @@ sudo apt install ffmpeg
 
 1. Get free Gemini Pro API token(s) at https://ai.google.dev/ use VPN and multiple accounts if needed.
 2. Get telegram bot token from @BotFather.
-3. Set up config.py, see example.
+3. Set up cfg.py, see example.
 4. Run bot ./tb.py or with systemd service (see example)
 
 # Report issues
