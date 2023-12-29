@@ -11,6 +11,7 @@ import requests
 import telebot
 from bs4 import BeautifulSoup
 from pylatexenc.latex2text import LatexNodes2Text
+from lingua import Language, LanguageDetectorBuilder
 
 import my_log
 
@@ -268,5 +269,51 @@ def download_image_as_bytes(url: str) -> bytes:
   return response.content
 
 
+language_attributes = dir(Language)
+language_names = [f'Language.{attr}' for attr in language_attributes if isinstance(attr, str) and attr.isupper()]
+languages = [eval(attr) for attr in language_names]
+def detect_lang(text: str) -> str:
+    """
+    Detects the language of the given text.
+
+    Parameters:
+        text (str): The text to be analyzed.
+
+    Returns:
+        str: The detected language code.
+    """
+    # create a list of all languages
+    # languages = [Language.AFRIKAANS, Language.ALBANIAN, Language.ARABIC, Language.ARMENIAN,
+    #              Language.AZERBAIJANI, Language.BASQUE, Language.BELARUSIAN, Language.BENGALI,
+    #              Language.BOKMAL, Language.BOSNIAN, Language.BULGARIAN, Language.CATALAN,
+    #              Language.CHINESE, Language.CROATIAN, Language.CZECH, Language.DANISH,
+    #              Language.DUTCH, Language.ENGLISH, Language.ESPERANTO, Language.ESTONIAN,
+    #              Language.FINNISH, Language.FRENCH, Language.GANDA, Language.GEORGIAN,
+    #              Language.GERMAN, Language.GREEK, Language.GUJARATI, Language.HEBREW,
+    #              Language.HINDI, Language.HUNGARIAN, Language.ICELANDIC, Language.INDONESIAN,
+    #              Language.IRISH, Language.ITALIAN, Language.JAPANESE, Language.KAZAKH,
+    #              Language.KOREAN, Language.LATIN, Language.LATVIAN, Language.LITHUANIAN,
+    #              Language.MACEDONIAN, Language.MALAY, Language.MAORI, Language.MARATHI,
+    #              Language.MONGOLIAN, Language.NYNORSK, Language.PERSIAN, Language.POLISH,
+    #              Language.PORTUGUESE, Language.PUNJABI, Language.ROMANIAN, Language.RUSSIAN,
+    #              Language.SERBIAN, Language.SHONA, Language.SLOVAK, Language.SLOVENE,
+    #              Language.SOMALI, Language.SOTHO, Language.SPANISH, Language.SWAHILI,
+    #              Language.SWEDISH, Language.TAGALOG, Language.TAMIL, Language.TELUGU,
+    #              Language.THAI, Language.TSONGA, Language.TSWANA, Language.TURKISH,
+    #              Language.UKRAINIAN, Language.URDU, Language.VIETNAMESE, Language.WELSH,
+    #              Language.XHOSA, Language.YORUBA, Language.ZULU]
+    
+    # language_attributes = dir(Language)
+    # language_names = [f'Language.{attr}' for attr in language_attributes if isinstance(attr, str) and attr.isupper()]
+    # languages = [eval(attr) for attr in language_names]
+    
+    detector = LanguageDetectorBuilder.from_languages(*languages).build()
+    language = detector.detect_language_of(text)
+    if language:
+        return language.iso_code_639_1.name.lower()
+    else:
+        return None
+
+
 if __name__ == '__main__':
-    pass
+    print(detect_lang('привет'))

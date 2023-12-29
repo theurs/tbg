@@ -22,3 +22,6 @@ users = [
 
 # bot name to access it in group
 bot_name = 'bot'
+
+# show tts button in answers
+tts_button = True

@@ -9,6 +9,7 @@ Gemini Pro AI telegram bot [python]
 
 • Answers questions about images when users send photos
 
+![example1](imgs/1.png) ![example1](imgs/2.png) ![example1](imgs/3.png)
 
 # Install
 

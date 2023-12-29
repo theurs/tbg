@@ -94,6 +94,43 @@ class ShowAction(threading.Thread):
         self.stop()
 
 
+def get_kbd(text: str) -> telebot.types.ReplyKeyboardMarkup:
+    """
+    Creates a keyboard with a single button.
+
+    Args:
+        text (str): The text of the button.
+
+    Returns:
+        telebot.types.ReplyKeyboardMarkup: The keyboard.
+    """
+    if text:
+        markup  = telebot.types.InlineKeyboardMarkup(row_width=5)
+        button1 = telebot.types.InlineKeyboardButton("TTS", callback_data='tts')
+        button2 = telebot.types.InlineKeyboardButton("Reset", callback_data='reset')
+        markup.add(button1, button2)
+        return markup
+    else:
+        return None
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call: telebot.types.CallbackQuery):
+    if authorized(call.message):
+        thread = threading.Thread(target=callback_inline_thread, args=(call,))
+        thread.start()
+def callback_inline_thread(call: telebot.types.CallbackQuery):
+        message = call.message
+        lang = message.from_user.language_code or 'en'
+
+        if call.data == 'tts':
+            lang = utils.detect_lang(message.text) or lang
+            message.text = f'/tts {lang} {message.text}'
+            tts(message)
+        elif call.data == 'reset':
+            reset(message)
+
+
 def img2txt(text, lang: str, chat_id_full: str, query: str = '') -> str:
     """
     Generate the text description of an image.
@@ -182,6 +219,8 @@ def authorized(message: telebot.types.Message) -> bool:
     Returns:
         bool: True if the user is authorized, False otherwise.
     """
+    if message.from_user.id == BOT_ID:
+        return True
     if cfg.users:
         if message.from_user.id in cfg.users:
             return True
@@ -243,6 +282,10 @@ def handle_photo_thread(message: telebot.types.Message):
     lang = get_lang(chat_id_full, message)
 
     is_private = message.chat.type == 'private'
+    if cfg.tts_button:
+        tts_button = get_kbd('tts')
+    else:
+        tts_button = None
 
     msglower = message.caption.lower() if message.caption else ''
 
@@ -261,7 +304,7 @@ def handle_photo_thread(message: telebot.types.Message):
             text = img2txt(image, lang, chat_id_full, message.caption)
             if text:
                 text = utils.bot_markdown_to_html(text)
-                reply_to_long_message(message, text, parse_mode='HTML')
+                reply_to_long_message(message, text, parse_mode='HTML', reply_markup=tts_button)
 
 
 @bot.message_handler(content_types = ['video', 'video_note'])
@@ -367,7 +410,8 @@ def tts_thread(message: telebot.types.Message):
 def reset(message: telebot.types.Message):
     if not authorized(message):
         return
-    my_gemini.reset(message.chat.id)
+    chat_id_full = get_topic_id(message)
+    gemini_reset(chat_id_full)
     bot.reply_to(message, 'History cleared')
 
 
@@ -382,7 +426,11 @@ Commands:
 /tts <lang> <text to say>
 /mem - show your history
 '''
-    bot.reply_to(message, f'Hello [{message.chat.id}]!\n\n{help}')
+    if cfg.tts_button:
+        tts_button = get_kbd('tts')
+    else:
+        tts_button = None
+    bot.reply_to(message, f'Hello [{message.chat.id}]!\n\n{help}', reply_markup=tts_button)
 
 
 def send_long_message(message: telebot.types.Message, resp: str, parse_mode:str = None, disable_web_page_preview: bool = None,
@@ -465,7 +513,10 @@ def do_task(message: telebot.types.Message):
     # unknown command
     if message.text.startswith('/'): return
 
-
+    if cfg.tts_button:
+        tts_button = get_kbd('tts')
+    else:
+        tts_button = None
     is_topic = message.is_topic_message or (message.reply_to_message and message.reply_to_message.is_topic_message)
     is_reply = message.reply_to_message and message.reply_to_message.from_user.id == BOT_ID
     is_private = message.chat.type == 'private'
@@ -508,7 +559,7 @@ def do_task(message: telebot.types.Message):
     if is_reply or is_private or bot_name_used:
 
         if len(msg) > my_gemini.MAX_REQUEST:
-            bot.reply_to(message, f'Too long message" {len(msg)} / {my_gemini.MAX_REQUEST}')
+            bot.reply_to(message, f'Too long message" {len(msg)} / {my_gemini.MAX_REQUEST}', reply_markup=tts_button)
             return
 
         formatted_date = datetime.datetime.now().strftime('%d, %b %Y %H:%M:%S')
@@ -527,10 +578,10 @@ def do_task(message: telebot.types.Message):
                     answer = utils.bot_markdown_to_html(answer)
                     try:
                         reply_to_long_message(message, answer, parse_mode='HTML',
-                                            disable_web_page_preview = True)
+                                            disable_web_page_preview = True, reply_markup=tts_button)
                     except Exception as error:
                         my_log.log2(f'tb:do_task: {error}')
-                        reply_to_long_message(message, answer, parse_mode='', disable_web_page_preview = True)
+                        reply_to_long_message(message, answer, parse_mode='', disable_web_page_preview = True, reply_markup=tts_button)
                 else:
                     bot.reply_to(message, 'No answer')
             except Exception as error3:
