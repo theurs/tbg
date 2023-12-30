@@ -50,76 +50,6 @@ SAVE_LOCK = threading.Lock()
 POOL_MAX_WORKERS = 100
 
 
-def save_proxy_pool():
-    """
-    Saves the proxy pool to disk.
-    """
-    global PROXY_POLL_SPEED
-    with SAVE_LOCK:
-        s = {}
-        for x in PROXY_POOL:
-            try:
-                s[x] = PROXY_POLL_SPEED[x]
-            except:
-                pass
-        PROXY_POLL_SPEED = s
-        with open(PROXY_POOL_DB_FILE, 'wb') as f:
-            pickle.dump(PROXY_POOL, f)
-        with open(PROXY_POLL_SPEED_DB_FILE, 'wb') as f:
-            pickle.dump(PROXY_POLL_SPEED, f)
-        # with open(PROXY_POOL_REMOVED_DB_FILE, 'wb') as f:
-        #     pickle.dump(PROXY_POOL_REMOVED, f)
-
-
-def remove_proxy(proxy: str):
-    """
-    Remove a proxy from the proxy pool and add it to the removed proxy pool.
-
-    Args:
-        proxy (str): The proxy to be removed.
-
-    Returns:
-        None
-    """
-    # не удалять прокси из конфига
-    try:
-        if proxy in cfg.gemini_proxies:
-            return
-    except AttributeError:
-        pass
-
-    global PROXY_POOL, PROXY_POOL_REMOVED
-
-    PROXY_POOL = [x for x in PROXY_POOL if x != proxy]
-
-    PROXY_POOL_REMOVED.append(proxy)
-    PROXY_POOL_REMOVED = list(set(PROXY_POOL_REMOVED))
-    
-    save_proxy_pool()
-
-
-def sort_proxies_by_speed(proxies):
-    """
-    Sort proxies by speed.
-
-    Args:
-        proxies (list): The list of proxies to be sorted.
-
-    Returns:
-        list: The sorted list of proxies.
-    """
-    # неопробованные прокси считаем что имеют скорость как было при поиске = 5 секунд(или менее)
-    for x in PROXY_POOL:
-        if x not in PROXY_POLL_SPEED:
-            PROXY_POLL_SPEED[x] = 5
-
-    try:
-        proxies.sort(key=lambda x: PROXY_POLL_SPEED[x])
-    except KeyError as key_error:
-        # my_log.log2(f'sort_proxies_by_speed: {key_error}')
-        pass
-
-
 def img2txt(data_: bytes, prompt: str = "What is in the image, in detail?") -> str:
     """
     Generates a textual description of an image based on its contents.
@@ -326,6 +256,7 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
                         break
                     else:
                         PROXY_POOL = [x for x in PROXY_POOL if x != proxy]
+                        save_proxy_pool()
                         my_log.log2(f'my_gemini:ai:{proxy} {key} {str(response)} {response.text}')
             else:
                 response = requests.post(url, json=mem_, timeout=60)
@@ -408,6 +339,76 @@ def get_mem_as_string(chat_id: str) -> str:
         if role == 'model':
             result += '\n'
     return result    
+
+
+def save_proxy_pool():
+    """
+    Saves the proxy pool to disk.
+    """
+    global PROXY_POLL_SPEED
+    with SAVE_LOCK:
+        s = {}
+        for x in PROXY_POOL:
+            try:
+                s[x] = PROXY_POLL_SPEED[x]
+            except:
+                pass
+        PROXY_POLL_SPEED = s
+        with open(PROXY_POOL_DB_FILE, 'wb') as f:
+            pickle.dump(PROXY_POOL, f)
+        with open(PROXY_POLL_SPEED_DB_FILE, 'wb') as f:
+            pickle.dump(PROXY_POLL_SPEED, f)
+        # with open(PROXY_POOL_REMOVED_DB_FILE, 'wb') as f:
+        #     pickle.dump(PROXY_POOL_REMOVED, f)
+
+
+def remove_proxy(proxy: str):
+    """
+    Remove a proxy from the proxy pool and add it to the removed proxy pool.
+
+    Args:
+        proxy (str): The proxy to be removed.
+
+    Returns:
+        None
+    """
+    # не удалять прокси из конфига
+    try:
+        if proxy in cfg.gemini_proxies:
+            return
+    except AttributeError:
+        pass
+
+    global PROXY_POOL, PROXY_POOL_REMOVED
+
+    PROXY_POOL = [x for x in PROXY_POOL if x != proxy]
+
+    PROXY_POOL_REMOVED.append(proxy)
+    PROXY_POOL_REMOVED = list(set(PROXY_POOL_REMOVED))
+    
+    save_proxy_pool()
+
+
+def sort_proxies_by_speed(proxies):
+    """
+    Sort proxies by speed.
+
+    Args:
+        proxies (list): The list of proxies to be sorted.
+
+    Returns:
+        list: The sorted list of proxies.
+    """
+    # неопробованные прокси считаем что имеют скорость как было при поиске = 5 секунд(или менее)
+    for x in PROXY_POOL:
+        if x not in PROXY_POLL_SPEED:
+            PROXY_POLL_SPEED[x] = 5
+
+    try:
+        proxies.sort(key=lambda x: PROXY_POLL_SPEED[x])
+    except KeyError as key_error:
+        # my_log.log2(f'sort_proxies_by_speed: {key_error}')
+        pass
 
 
 def test_proxy_for_gemini(proxy: str = '') -> bool:
@@ -503,7 +504,7 @@ def get_proxies():
                     future.result()
 
     except Exception as error:
-        my_log.log2(f'proxy:get_proxies: {error}')
+        my_log.log2(f'my_gemini:get_proxies: {error}')
 
 
 def update_proxy_pool_daemon():
