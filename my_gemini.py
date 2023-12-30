@@ -37,7 +37,12 @@ CHATS = {}
 PROXY_POOL = []
 PROXY_POLL_SPEED = {}
 PROXY_POOL_REMOVED = []
+
+# искать и добавлять прокси пока не найдется хотя бы 10 проксей
 MAX_PROXY_POOL = 10
+# начинать повторный поиск если осталось всего 5 проксей
+MAX_PROXY_POOL_LOW_MARGIN = 5
+
 PROXY_POOL_DB_FILE = 'db/gemini_proxy_pool.pkl'
 PROXY_POLL_SPEED_DB_FILE = 'db/gemini_proxy_pool_speed.pkl'
 # PROXY_POOL_REMOVED_DB_FILE = 'db/gemini_proxy_pool_removed.pkl'
@@ -517,7 +522,7 @@ def update_proxy_pool_daemon():
     """
     global PROXY_POOL
     while 1:
-        if len(PROXY_POOL) < MAX_PROXY_POOL:
+        if len(PROXY_POOL) < MAX_PROXY_POOL_LOW_MARGIN:
                 get_proxies()
                 PROXY_POOL = list(set(PROXY_POOL))
                 save_proxy_pool()
