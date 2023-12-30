@@ -250,7 +250,7 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
                             remove_proxy(proxy)
                         else:
                             # запоминаем как быстро дает ответ через эту прокси для короткого запроса
-                            if len(result) < 600 and total_time < 10:
+                            if len(result) < 600 and total_time < 10 or total_time < 20:
                                 PROXY_POLL_SPEED[proxy] = total_time
                                 save_proxy_pool()
                         break
