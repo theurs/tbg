@@ -35,11 +35,35 @@ CHATS = {}
 # and if that doesn't work, we start looking for free proxies using
 # a constantly running daemon
 PROXY_POOL = []
+PROXY_POLL_SPEED = {}
 PROXY_POOL_REMOVED = []
 MAX_PROXY_POOL = 10
 PROXY_POOL_DB_FILE = 'db/gemini_proxy_pool.pkl'
-PROXY_POOL_REMOVED_DB_FILE = 'db/gemini_proxy_pool_removed.pkl'
+PROXY_POLL_SPEED_DB_FILE = 'db/gemini_proxy_pool_speed.pkl'
+# PROXY_POOL_REMOVED_DB_FILE = 'db/gemini_proxy_pool_removed.pkl'
 SAVE_LOCK = threading.Lock()
+POOL_MAX_WORKERS = 100
+
+
+def save_proxy_pool():
+    """
+    Saves the proxy pool to disk.
+    """
+    global PROXY_POLL_SPEED
+    with SAVE_LOCK:
+        s = {}
+        for x in PROXY_POOL:
+            try:
+                s[x] = PROXY_POLL_SPEED[x]
+            except:
+                pass
+        PROXY_POLL_SPEED = s
+        with open(PROXY_POOL_DB_FILE, 'wb') as f:
+            pickle.dump(PROXY_POOL, f)
+        with open(PROXY_POLL_SPEED_DB_FILE, 'wb') as f:
+            pickle.dump(PROXY_POLL_SPEED, f)
+        # with open(PROXY_POOL_REMOVED_DB_FILE, 'wb') as f:
+        #     pickle.dump(PROXY_POOL_REMOVED, f)
 
 
 def remove_proxy(proxy: str):
@@ -65,12 +89,30 @@ def remove_proxy(proxy: str):
 
     PROXY_POOL_REMOVED.append(proxy)
     PROXY_POOL_REMOVED = list(set(PROXY_POOL_REMOVED))
+    
+    save_proxy_pool()
 
-    with SAVE_LOCK:
-        with open(PROXY_POOL_DB_FILE, 'wb') as f:
-            pickle.dump(PROXY_POOL, f)
-        with open(PROXY_POOL_REMOVED_DB_FILE, 'wb') as f:
-            pickle.dump(PROXY_POOL_REMOVED, f)
+
+def sort_proxies_by_speed(proxies):
+    """
+    Sort proxies by speed.
+
+    Args:
+        proxies (list): The list of proxies to be sorted.
+
+    Returns:
+        list: The sorted list of proxies.
+    """
+    # неопробованные прокси считаем что имеют скорость как было при поиске = 5 секунд(или менее)
+    for x in PROXY_POOL:
+        if x not in PROXY_POLL_SPEED:
+            PROXY_POLL_SPEED[x] = 5
+
+    try:
+        proxies.sort(key=lambda x: PROXY_POLL_SPEED[x])
+    except KeyError as key_error:
+        # my_log.log2(f'sort_proxies_by_speed: {key_error}')
+        pass
 
 
 def img2txt(data_: bytes, prompt: str = "What is in the image, in detail?") -> str:
@@ -118,6 +160,7 @@ def img2txt(data_: bytes, prompt: str = "What is in the image, in detail?") -> s
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key={api_key}"
 
             if proxies:
+                sort_proxies_by_speed(proxies)
                 for proxy in proxies:
                     start_time = time.time()
                     session = requests.Session()
@@ -130,6 +173,9 @@ def img2txt(data_: bytes, prompt: str = "What is in the image, in detail?") -> s
                             total_time = end_time - start_time
                             if total_time > 45:
                                 remove_proxy(proxy)
+                            # не участвовать в рейтинге скорости прокси так как ответы всегда заметно более долгие
+                            # else:
+                            #     PROXY_POLL_SPEED[proxy] = total_time
                             break
                     except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError) as error:
                         remove_proxy(proxy)
@@ -242,7 +288,7 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
         proxies = [proxy_str, ]
     else:
         proxies = PROXY_POOL[:]
-        random.shuffle(proxies)
+        # random.shuffle(proxies)
 
     proxy = ''
     try:
@@ -250,6 +296,7 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
             url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + key
 
             if proxies:
+                sort_proxies_by_speed(proxies)
                 for proxy in proxies:
                     start_time = time.time()
                     session = requests.Session()
@@ -264,8 +311,13 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
                         result = response.json()['candidates'][0]['content']['parts'][0]['text']
                         end_time = time.time()
                         total_time = end_time - start_time
-                        if total_time > 40 or (len(result) < 300 and total_time > 10):
+                        if total_time > 40 or (len(result) < 600 and total_time > 10):
                             remove_proxy(proxy)
+                        else:
+                            # запоминаем как быстро дает ответ через эту прокси для короткого запроса
+                            if len(result) < 600 and total_time < 10:
+                                PROXY_POLL_SPEED[proxy] = total_time
+                                save_proxy_pool()
                         break
                     else:
                         PROXY_POOL = [x for x in PROXY_POOL if x != proxy]
@@ -379,6 +431,11 @@ def test_proxy_for_gemini(proxy: str = '') -> bool:
         - The 'PROXY_POOL_REMOVED' and 'PROXY_POOL' variables are assumed to be defined elsewhere in the code.
         - The 'time' module is assumed to be imported.
     """
+
+    # # не искать больше чем нужно
+    # if proxy and len(PROXY_POOL) > MAX_PROXY_POOL:
+    #     return
+
     query = '1+1= answer very short'
     start_time = time.time()
     answer = ai(query, proxy_str=proxy)
@@ -395,6 +452,7 @@ def test_proxy_for_gemini(proxy: str = '') -> bool:
         if answer and answer not in PROXY_POOL_REMOVED:
             if total_time < 5:
                 PROXY_POOL.append(proxy)
+                save_proxy_pool()
 
 
 def get_proxies():
@@ -425,10 +483,19 @@ def get_proxies():
         except Exception as error:
             my_log.log2(f'my_gemini:get_proxies: {error}')
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-            futures = [executor.submit(test_proxy_for_gemini, proxy) for proxy in proxies]
-            for future in futures:
-                future.result()
+        n = 0
+        maxn = len(proxies)
+        step = POOL_MAX_WORKERS
+
+        while n < maxn:
+            if len(PROXY_POOL) > MAX_PROXY_POOL:
+                break
+            chunk = proxies[n:n+step]
+            n += step
+            with concurrent.futures.ThreadPoolExecutor(max_workers=POOL_MAX_WORKERS) as executor:
+                futures = [executor.submit(test_proxy_for_gemini, proxy) for proxy in chunk]
+                for future in futures:
+                    future.result()
 
     except Exception as error:
         my_log.log2(f'proxy:get_proxies: {error}')
@@ -453,11 +520,7 @@ def update_proxy_pool_daemon():
         if len(PROXY_POOL) < MAX_PROXY_POOL:
                 get_proxies()
                 PROXY_POOL = list(set(PROXY_POOL))
-                with SAVE_LOCK:
-                    with open(PROXY_POOL_DB_FILE, 'wb') as f:
-                        pickle.dump(PROXY_POOL, f)
-                    with open(PROXY_POOL_REMOVED_DB_FILE, 'wb') as f:
-                        pickle.dump(PROXY_POOL_REMOVED, f)
+                save_proxy_pool()
                 time.sleep(60*60)
         else:
             time.sleep(60)
@@ -478,7 +541,7 @@ def run_proxy_pool_daemon():
 
     This function does not take any parameters and does not return anything.
     """
-    global PROXY_POOL, PROXY_POOL_REMOVED
+    global PROXY_POOL, PROXY_POOL_REMOVED, PROXY_POLL_SPEED
     try:
         proxies = cfg.gemini_proxies
     except AttributeError:
@@ -500,8 +563,10 @@ def run_proxy_pool_daemon():
         try:
             with open(PROXY_POOL_DB_FILE, 'rb') as f:
                 PROXY_POOL = pickle.load(f)
-            with open(PROXY_POOL_REMOVED_DB_FILE, 'rb') as f:
-                PROXY_POOL_REMOVED = pickle.load(f)
+            with open(PROXY_POLL_SPEED_DB_FILE, 'rb') as f:
+                PROXY_POLL_SPEED = pickle.load(f)
+            # with open(PROXY_POOL_REMOVED_DB_FILE, 'rb') as f:
+            #     PROXY_POOL_REMOVED = pickle.load(f)
         except:
             pass
         thread = threading.Thread(target=update_proxy_pool_daemon)
