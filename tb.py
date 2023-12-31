@@ -324,7 +324,7 @@ def handle_photo_thread(message: telebot.types.Message):
             file_info = bot.get_file(photo.file_id)
             image = bot.download_file(file_info.file_path)
             
-            text = img2txt(image, lang, chat_id_full, message.caption)
+            text = img2txt(image, lang, chat_id_full, message.caption or 'Describe image')
             if text:
                 text = utils.bot_markdown_to_html(text)
                 reply_to_long_message(message, text, parse_mode='HTML', reply_markup=tts_button)
