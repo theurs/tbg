@@ -314,7 +314,8 @@ def handle_photo_thread(message: telebot.types.Message):
 
     if msglower.startswith('?') or is_private:
         state = 'describe'
-        message.caption = message.caption[1:]
+        if message.caption and message.caption[0] == '?':
+            message.caption = message.caption[1:]
     else:
         state = ''
 
@@ -324,7 +325,7 @@ def handle_photo_thread(message: telebot.types.Message):
             file_info = bot.get_file(photo.file_id)
             image = bot.download_file(file_info.file_path)
             
-            text = img2txt(image, lang, chat_id_full, message.caption or 'Describe image')
+            text = img2txt(image, lang, chat_id_full, message.caption)
             if text:
                 text = utils.bot_markdown_to_html(text)
                 reply_to_long_message(message, text, parse_mode='HTML', reply_markup=tts_button)
