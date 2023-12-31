@@ -522,6 +522,7 @@ def update_proxy_pool_daemon():
     """
     global PROXY_POOL
     while 1:
+        print(f'Proxies found: {len(PROXY_POOL)}')
         if len(PROXY_POOL) < MAX_PROXY_POOL_LOW_MARGIN:
                 get_proxies()
                 PROXY_POOL = list(set(PROXY_POOL))
