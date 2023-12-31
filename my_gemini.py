@@ -47,7 +47,7 @@ PROXY_POOL_DB_FILE = 'db/gemini_proxy_pool.pkl'
 PROXY_POLL_SPEED_DB_FILE = 'db/gemini_proxy_pool_speed.pkl'
 # PROXY_POOL_REMOVED_DB_FILE = 'db/gemini_proxy_pool_removed.pkl'
 SAVE_LOCK = threading.Lock()
-POOL_MAX_WORKERS = 500
+POOL_MAX_WORKERS = 50
 
 
 def img2txt(data_: bytes, prompt: str = "What is in the image, in detail?") -> str:
