@@ -47,7 +47,7 @@ PROXY_POOL_DB_FILE = 'db/gemini_proxy_pool.pkl'
 PROXY_POLL_SPEED_DB_FILE = 'db/gemini_proxy_pool_speed.pkl'
 # PROXY_POOL_REMOVED_DB_FILE = 'db/gemini_proxy_pool_removed.pkl'
 SAVE_LOCK = threading.Lock()
-POOL_MAX_WORKERS = 100
+POOL_MAX_WORKERS = 500
 
 
 def img2txt(data_: bytes, prompt: str = "What is in the image, in detail?") -> str:
@@ -458,6 +458,7 @@ def test_proxy_for_gemini(proxy: str = '') -> bool:
         if answer and answer not in PROXY_POOL_REMOVED:
             if total_time < 5:
                 PROXY_POOL.append(proxy)
+                PROXY_POLL_SPEED[proxy] = total_time
                 save_proxy_pool()
 
 
