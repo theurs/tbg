@@ -417,7 +417,7 @@ def tts_thread(message: telebot.types.Message):
     try:
         lang = message.text.split(maxsplit=2)[1]
         text = message.text.split(maxsplit=2)[2]
-    except IndexError:
+    except:
         bot.reply_to(message, 'Usage: /tts <language code> <test to say>')
         return
 
