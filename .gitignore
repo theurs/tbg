@@ -4,3 +4,6 @@ __pycache__
 test.py
 db/*
 logs/*
+build/*
+tb.spec
+dist/*

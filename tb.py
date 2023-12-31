@@ -18,7 +18,14 @@ import utils
 
 
 # Setting the working directory to the directory where the script is located
-os.chdir(os.path.abspath(os.path.dirname(__file__)))
+if os.name == 'nt':
+    settings_path = f'{os.environ["APPDATA"]}/gemini_telegram_tob'
+    if not os.path.exists(settings_path):
+        os.mkdir(settings_path)
+    os.chdir(settings_path)
+else:
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
 
 if not os.path.exists('db'):
     os.mkdir('db')
@@ -408,6 +415,9 @@ def tts_thread(message: telebot.types.Message):
 
 @bot.message_handler(commands=['reset'])
 def reset(message: telebot.types.Message):
+    if is_for_me(message.text)[0]: message.text = is_for_me(message.text)[1]
+    else: return
+
     if not authorized(message):
         return
     chat_id_full = get_topic_id(message)
@@ -425,12 +435,44 @@ Commands:
 /reset - clear history
 /tts <lang> <text to say>
 /mem - show your history
+/proxy - show proxies
 '''
     if cfg.tts_button:
         tts_button = get_kbd('tts')
     else:
         tts_button = None
     bot.reply_to(message, f'Hello [{message.chat.id}]!\n\n{help}', reply_markup=tts_button)
+
+
+@bot.message_handler(commands=['proxy'])
+def proxy(message: telebot.types.Message):
+    # не обрабатывать команды к другому боту /cmd@botname args
+    if is_for_me(message.text)[0]: message.text = is_for_me(message.text)[1]
+    else: return
+
+    if not authorized(message):
+        return
+
+    chat_id_full = get_topic_id(message)
+    lang = get_lang(chat_id_full, message)
+
+    proxies = my_gemini.PROXY_POOL[:]
+    my_gemini.sort_proxies_by_speed(proxies)
+
+    msg = ''
+
+    n = 0
+    for x in proxies:
+        n += 1
+        p1 = f'{int(my_gemini.PROXY_POLL_SPEED[x]):02}'
+        p2 = f'{round(my_gemini.PROXY_POLL_SPEED[x], 2):.2f}'.split('.')[1]
+        msg += f'[{n:02}] [{p1}.{p2}] {[x]}\n'
+
+    if not msg:
+        msg = tr('Ничего нет', lang)
+
+    bot.reply_to(message, f'Try this proxy to access https://ai.google.dev/\n\n<code>{msg}</code>',
+                 parse_mode='HTML', disable_web_page_preview=True)
 
 
 def send_long_message(message: telebot.types.Message, resp: str, parse_mode:str = None, disable_web_page_preview: bool = None,
