@@ -577,8 +577,8 @@ def run_proxy_pool_daemon():
         thread = threading.Thread(target=update_proxy_pool_daemon)
         thread.start()
         # Waiting until at least 1 proxy is found
-        while len(PROXY_POOL) < 1:
-            time.sleep(1)
+        # while len(PROXY_POOL) < 1:
+        #     time.sleep(1)
 
 
 def chat_cli():
