@@ -239,7 +239,11 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
                     try:
                         response = session.post(url, json=mem_, timeout=60)
                     except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError) as error:
-                        remove_proxy(proxy)
+                        reasons = ['Connection aborted', 'Max retries exceeded with url',]
+                        if any(x in str(error) for x in reasons):
+                            remove_proxy(proxy)
+                        else:
+                            my_log.log3(f'{error}\n\n{proxy}')
                         continue
 
                     if response.status_code == 200:
@@ -495,13 +499,17 @@ def get_proxies():
         while n < maxn:
             if len(PROXY_POOL) > MAX_PROXY_POOL:
                 break
+            if len(PROXY_POOL) == 0:
+                step = 500
+            else:
+                step = POOL_MAX_WORKERS
             chunk = proxies[n:n+step]
             n += step
-            with concurrent.futures.ThreadPoolExecutor(max_workers=POOL_MAX_WORKERS) as executor:
+            print(f'Proxies found: {len(PROXY_POOL)} (processing {n} of {maxn})')
+            with concurrent.futures.ThreadPoolExecutor(max_workers=step) as executor:
                 futures = [executor.submit(test_proxy_for_gemini, proxy) for proxy in chunk]
                 for future in futures:
                     future.result()
-
     except Exception as error:
         my_log.log2(f'my_gemini:get_proxies: {error}')
 
@@ -522,7 +530,6 @@ def update_proxy_pool_daemon():
     """
     global PROXY_POOL
     while 1:
-        print(f'Proxies found: {len(PROXY_POOL)}')
         if len(PROXY_POOL) < MAX_PROXY_POOL_LOW_MARGIN:
                 get_proxies()
                 PROXY_POOL = list(set(PROXY_POOL))

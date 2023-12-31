@@ -1,5 +1,7 @@
+asyncio
 bs4
-gTTS
+# gTTS
+edge_tts
 lingua-language-detector
 prettytable
 Proxy-List-Scrapper

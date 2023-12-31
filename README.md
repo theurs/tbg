@@ -33,6 +33,11 @@ sudo apt install ffmpeg
 3. Set up cfg.py, see example.
 4. Run bot ./tb.py or with systemd service (see example)
 
+In windows download and install ffmpeg from https://ffmpeg.org/download.html
+1. Download and run EXE file with telegram bot token as argument
+2. Set keys with /key command
+3. Set users with /users command
+
 # Report issues
 
 https://t.me/theurs

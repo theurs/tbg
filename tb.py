@@ -2,6 +2,9 @@
 
 import io
 import os
+import pickle
+import re
+import sys
 import tempfile
 import datetime
 import threading
@@ -18,8 +21,19 @@ import utils
 
 
 # Setting the working directory to the directory where the script is located
+# print(sys.argv)
 if os.name == 'nt':
+    if not cfg.token:
+        if not sys.argv[1]:
+            print('Usage: tb.py <telegram token>')
+            sys.exit(1)
+        cfg.token = sys.argv[1]
+        print(f'Telegram token: {cfg.token[:5]}xxxxx')
+    else:
+        pass
+
     settings_path = f'{os.environ["APPDATA"]}/gemini_telegram_tob'
+    print(f'Settings path: {settings_path}')
     if not os.path.exists(settings_path):
         os.mkdir(settings_path)
     os.chdir(settings_path)
@@ -32,6 +46,8 @@ if not os.path.exists('db'):
 if not os.path.exists('logs'):
     os.mkdir('logs')
 
+KEYS_DB_FILE = 'db/gemini_keys.pkl'
+USERS_DB_FILE = 'db/gemini_users.pkl'
 
 bot = telebot.TeleBot(cfg.token, skip_pending=True)
 _bot_name = bot.get_me().username
@@ -435,13 +451,57 @@ Commands:
 /reset - clear history
 /tts <lang> <text to say>
 /mem - show your history
-/proxy - show proxies
+
+/proxy - show found proxies
+/key <keys> - set gemini keys
+/users <whitespace separated users id> - set authorized users
 '''
     if cfg.tts_button:
         tts_button = get_kbd('tts')
     else:
         tts_button = None
     bot.reply_to(message, f'Hello [{message.chat.id}]!\n\n{help}', reply_markup=tts_button)
+
+
+@bot.message_handler(commands=['key'])
+def gemini_keys(message: telebot.types.Message):
+    # не обрабатывать команды к другому боту /cmd@botname args
+    if is_for_me(message.text)[0]: message.text = is_for_me(message.text)[1]
+    else: return
+
+    if not authorized(message):
+        return
+
+    try:
+        keys = re.findall("[A-Za-z0-9\-_]{39}", message.text)
+        cfg.gemini_keys = keys
+        with open(KEYS_DB_FILE, 'wb') as f:
+            pickle.dump(cfg.gemini_keys, f)
+        bot.reply_to(message, f'Saved {len(keys)} keys')
+    except Exception as error:
+        my_log.log2(f'{error}\n\n{message.text}')
+        bot.reply_to(message, 'Usage: /key <gemini keys>')
+
+
+@bot.message_handler(commands=['users'])
+def set_users(message: telebot.types.Message):
+    # не обрабатывать команды к другому боту /cmd@botname args
+    if is_for_me(message.text)[0]: message.text = is_for_me(message.text)[1]
+    else: return
+
+    if not authorized(message):
+        return
+
+    try:
+        users = message.text.split()[1:]
+        users = [int(x) for x in users]
+        cfg.users = users
+        with open(USERS_DB_FILE, 'wb') as f:
+            pickle.dump(cfg.users, f)
+        bot.reply_to(message, f'Saved {len(users)} users')
+    except Exception as error:
+        my_log.log2(f'{error}\n\n{message.text}')
+        bot.reply_to(message, 'Usage: /users <users whitespace separated>')
 
 
 @bot.message_handler(commands=['proxy'])
@@ -452,9 +512,6 @@ def proxy(message: telebot.types.Message):
 
     if not authorized(message):
         return
-
-    chat_id_full = get_topic_id(message)
-    lang = get_lang(chat_id_full, message)
 
     proxies = my_gemini.PROXY_POOL[:]
     my_gemini.sort_proxies_by_speed(proxies)
@@ -469,7 +526,7 @@ def proxy(message: telebot.types.Message):
         msg += f'[{n:02}] [{p1}.{p2}] {[x]}\n'
 
     if not msg:
-        msg = tr('Ничего нет', lang)
+        msg = 'No proxies found'
 
     bot.reply_to(message, f'Try this proxy to access https://ai.google.dev/\n\n<code>{msg}</code>',
                  parse_mode='HTML', disable_web_page_preview=True)
@@ -632,5 +689,12 @@ def do_task(message: telebot.types.Message):
 
 
 if __name__ == '__main__':
+    try:
+        with open(KEYS_DB_FILE, 'rb') as f:
+            cfg.gemini_keys = pickle.load(f)
+        with open(USERS_DB_FILE, 'rb') as f:
+            cfg.users = pickle.load(f)
+    except Exception as load_keys_error:
+        my_log.log2(f'tb:load_keys_error: {load_keys_error} {KEYS_DB_FILE}')
     my_gemini.run_proxy_pool_daemon()
     bot.polling(timeout=90, long_polling_timeout=90)
