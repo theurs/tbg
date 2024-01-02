@@ -257,8 +257,7 @@ def ai(q: str, mem = [], temperature: float = 0.1, proxy_str: str = '') -> str:
                             save_proxy_pool()
                         break
                     else:
-                        PROXY_POOL = [x for x in PROXY_POOL if x != proxy]
-                        save_proxy_pool()
+                        remove_proxy(proxy)
                         my_log.log2(f'my_gemini:ai:{proxy} {key} {str(response)} {response.text}')
             else:
                 response = requests.post(url, json=mem_, timeout=60)
