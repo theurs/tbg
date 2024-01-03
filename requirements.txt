@@ -8,5 +8,5 @@ Proxy-List-Scrapper
 pylatexenc
 pysocks
 SpeechRecognition
+sqlitedict
 telebot
-

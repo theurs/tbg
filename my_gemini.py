@@ -12,6 +12,8 @@ import time
 import requests
 from Proxy_List_Scrapper import Scrapper
 
+from sqlitedict import SqliteDict
+
 import cfg
 import my_log
 
@@ -28,7 +30,7 @@ MAX_CHAT_SIZE = 25000
 
 
 # Dialog storage {id:list(mem)}
-CHATS = {}
+CHATS = SqliteDict('db/gemini_chats.db', autocommit=True)
 
 
 # If no proxies are specified in the config, then we first try to work directly
@@ -332,14 +334,19 @@ def get_mem_as_string(chat_id: str) -> str:
     result = ''
     for x in mem:
         role = x['role']
+        if role == 'user': role = '𝐔𝐒𝐄𝐑'
+        if role == 'model': role = '𝐁𝐎𝐓'
         try:
             text = x['parts'][0]['text'].split(']: ', maxsplit=1)[1]
         except IndexError:
             text = x['parts'][0]['text']
+        if text.startswith('[Info to help you answer'):
+            end = text.find(']') + 1
+            text = text[end:].strip()
         result += f'{role}: {text}\n'
-        if role == 'model':
+        if role == '𝐁𝐎𝐓':
             result += '\n'
-    return result    
+    return result 
 
 
 def save_proxy_pool():

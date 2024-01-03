@@ -1,24 +1,10 @@
 #!/usr/bin/env python3
 
-import io
+
+#######################################################################
 import os
-import pickle
-import re
 import sys
-import tempfile
-import datetime
-import threading
-import time
-
-import telebot
-
 import cfg
-import my_gemini
-import my_log
-import my_stt
-import my_tts
-import utils
-
 
 # Setting the working directory to the directory where the script is located
 # print(sys.argv)
@@ -45,6 +31,27 @@ if not os.path.exists('db'):
     os.mkdir('db')
 if not os.path.exists('logs'):
     os.mkdir('logs')
+#######################################################################
+
+
+import io
+import pickle
+import re
+import tempfile
+import datetime
+import threading
+import time
+
+import telebot
+
+import my_gemini
+import my_log
+import my_stt
+import my_tts
+import utils
+
+
+
 
 KEYS_DB_FILE = 'db/gemini_keys.pkl'
 USERS_DB_FILE = 'db/gemini_users.pkl'
