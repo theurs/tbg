@@ -578,7 +578,7 @@ def run_proxy_pool_daemon():
     else:
         PROXY_POOL = proxies
 
-    if not PROXY_POOL and not direct_connect_available:
+    if not proxies and not direct_connect_available:
         try:
             with open(PROXY_POOL_DB_FILE, 'rb') as f:
                 PROXY_POOL = pickle.load(f)
