@@ -16,22 +16,80 @@ from lingua import Language, LanguageDetectorBuilder
 import my_log
 
 
-def split_text(text: str, chunk_limit: int = 1500):
-    """ Splits one string into multiple strings, with a maximum amount of chars_per_string
-        characters per string. This is very useful for splitting one giant message into multiples.
-        If chars_per_string > 4096: chars_per_string = 4096. Splits by '\n', '. ' or ' ' in exactly
-        this priority.
+def bot_markdown_to_html(text: str) -> str:
+    # переделывает маркдаун от чатботов в хтмл для телеграма
+    # сначала делается полное экранирование
+    # затем меняются маркдаун теги и оформление на аналогичное в хтмл
+    # при этом не затрагивается то что внутри тегов код, там только экранирование
+    # латекс код в тегах $ и $$ меняется на юникод текст
 
-        :param text: The text to split
-        :type text: str
+    # экранируем весь текст для html
+    text = html.escape(text)
+    
+    # найти все куски кода между ``` и заменить на хеши
+    # спрятать код на время преобразований
+    matches = re.findall('```(.*?)```', text, flags=re.DOTALL)
+    list_of_code_blocks = []
+    for match in matches:
+        random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
+        list_of_code_blocks.append([match, random_string])
+        text = text.replace(f'```{match}```', random_string)
 
-        :param chars_per_string: The number of maximum characters per part the text is split to.
-        :type chars_per_string: int
+    # тут могут быть одиночные поворяющиеся `, меняем их на '
+    text = text.replace('```', "'''")
 
-        :return: The splitted text as a list of strings.
-        :rtype: list of str
-    """
-    return telebot.util.smart_split(text, chunk_limit)
+    matches = re.findall('`(.*?)`', text, flags=re.DOTALL)
+    list_of_code_blocks2 = []
+    for match in matches:
+        random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
+        list_of_code_blocks2.append([match, random_string])
+        text = text.replace(f'`{match}`', random_string)
+
+    # переделываем списки на более красивые
+    new_text = ''
+    for i in text.split('\n'):
+        ii = i.strip()
+        if ii.startswith('* '):
+            i = i.replace('* ', '• ', 1)
+        if ii.startswith('- '):
+            i = i.replace('- ', '• ', 1)
+        new_text += i + '\n'
+    text = new_text.strip()
+
+    # 1 или 2 * в <b></b>
+    text = re.sub('\*\*(.+?)\*\*', '<b>\\1</b>', text)
+
+    # tex в unicode
+    matches = re.findall("\$\$?(.*?)\$\$?", text, flags=re.DOTALL)
+    for match in matches:
+        new_match = LatexNodes2Text().latex_to_text(match.replace('\\\\', '\\'))
+        text = text.replace(f'$${match}$$', new_match)
+        text = text.replace(f'${match}$', new_match)
+
+    # меняем маркдаун ссылки на хтмл
+    text = re.sub(r'\[([^\]]*)\]\(([^\)]*)\)', r'<a href="\2">\1</a>', text)
+    # меняем все ссылки на ссылки в хтмл теге кроме тех кто уже так оформлен
+    text = re.sub(r'(?<!<a href=")(https?://\S+)(?!">[^<]*</a>)', r'<a href="\1">\1</a>', text)
+
+    # меняем таблицы до возвращения кода
+    text = replace_tables(text)
+
+    # меняем обратно хеши на блоки кода
+    for match, random_string in list_of_code_blocks2:
+        # new_match = html.escape(match)
+        new_match = match
+        text = text.replace(random_string, f'<code>{new_match}</code>')
+
+    # меняем обратно хеши на блоки кода
+    for match, random_string in list_of_code_blocks:
+        new_match = match
+        text = text.replace(random_string, f'<code>{new_match}</code>')
+
+    text = replace_code_lang(text)
+
+    # text = replace_tables(text)
+
+    return text
 
 
 def replace_code_lang(t: str) -> str:
@@ -62,60 +120,66 @@ def replace_code_lang(t: str) -> str:
     return result
 
 
-def bot_markdown_to_html(text: str) -> str:
-    text = html.escape(text)
-    
-    matches = re.findall('```(.*?)```', text, flags=re.DOTALL)
-    list_of_code_blocks = []
-    for match in matches:
-        random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
-        list_of_code_blocks.append([match, random_string])
-        text = text.replace(f'```{match}```', random_string)
-    matches = re.findall('`(.*?)`', text, flags=re.DOTALL)
-    list_of_code_blocks2 = []
-    for match in matches:
-        random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
-        list_of_code_blocks2.append([match, random_string])
-        text = text.replace(f'`{match}`', random_string)
+def replace_tables(text: str) -> str:
+    text += '\n'
+    state = 0
+    table = ''
+    results = []
+    for line in text.split('\n'):
+        if line.count('|') > 2 and len(line) > 4:
+            if state == 0:
+                state = 1
+            table += line + '\n'
+        else:
+            if state == 1:
+                results.append(table[:-1])
+                table = ''
+                state = 0
 
-    new_text = ''
-    for i in text.split('\n'):
-        ii = i.strip()
-        if ii.startswith('* '):
-            i = i.replace('* ', '• ', 1)
-        if ii.startswith('- '):
-            i = i.replace('- ', '• ', 1)
-        new_text += i + '\n'
-    text = new_text.strip()
+    for table in results:
+        x = prettytable.PrettyTable(align = "l",
+                                    set_style = prettytable.MSWORD_FRIENDLY,
+                                    hrules = prettytable.HEADER,
+                                    junction_char = '|')
 
-    text = re.sub('\*\*(.+?)\*\*', '<b>\\1</b>', text)
-
-    matches = re.findall("\$\$?(.*?)\$\$?", text, flags=re.DOTALL)
-    for match in matches:
-        new_match = LatexNodes2Text().latex_to_text(match.replace('\\\\', '\\'))
-        text = text.replace(f'$${match}$$', new_match)
-        text = text.replace(f'${match}$', new_match)
-
-    text = re.sub(r'\[([^\]]*)\]\(([^\)]*)\)', r'<a href="\2">\1</a>', text)
-
-    text = re.sub(r'(?<!<a href=")(https?://\S+)(?!">[^<]*</a>)', r'<a href="\1">\1</a>', text)
-
-
-    for match, random_string in list_of_code_blocks2:
-        # new_match = html.escape(match)
-        new_match = match
-        text = text.replace(random_string, f'<code>{new_match}</code>')
-
-
-    for match, random_string in list_of_code_blocks:
-        new_match = match
-        text = text.replace(random_string, f'<code>{new_match}</code>')
-
-    text = replace_code_lang(text)
-
-    text = replace_tables(text)
+        lines = table.split('\n')
+        header = [x.strip().replace('<b>', '').replace('</b>', '') for x in lines[0].split('|') if x]
+        header = [split_long_string(x, header = True) for x in header]
+        try:
+            x.field_names = header
+        except Exception as error:
+            my_log.log2(f'tb:replace_tables: {error}')
+            continue
+        for line in lines[2:]:
+            row = [x.strip().replace('<b>', '').replace('</b>', '') for x in line.split('|') if x]
+            row = [split_long_string(x) for x in row]
+            try:
+                x.add_row(row)
+            except Exception as error2:
+                my_log.log2(f'tb:replace_tables: {error2}')
+                continue
+        new_table = x.get_string()
+        text = text.replace(table, f'<pre><code>{new_table}</code></pre>')
 
     return text
+
+
+def split_text(text: str, chunk_limit: int = 1500):
+    """ Splits one string into multiple strings, with a maximum amount of chars_per_string
+        characters per string. This is very useful for splitting one giant message into multiples.
+        If chars_per_string > 4096: chars_per_string = 4096. Splits by '\n', '. ' or ' ' in exactly
+        this priority.
+
+        :param text: The text to split
+        :type text: str
+
+        :param chars_per_string: The number of maximum characters per part the text is split to.
+        :type chars_per_string: int
+
+        :return: The splitted text as a list of strings.
+        :rtype: list of str
+    """
+    return telebot.util.smart_split(text, chunk_limit)
 
 
 def split_html(text: str, max_length: int = 1500) -> list:
@@ -209,50 +273,6 @@ def split_long_string(long_string: str, header = False, MAX_LENGTH = 24) -> str:
 
     result = "\n".join(split_strings) 
     return result
-
-
-def replace_tables(text: str) -> str:
-    text += '\n'
-    state = 0
-    table = ''
-    results = []
-    for line in text.split('\n'):
-        if line.count('|') > 2 and len(line) > 4:
-            if state == 0:
-                state = 1
-            table += line + '\n'
-        else:
-            if state == 1:
-                results.append(table[:-1])
-                table = ''
-                state = 0
-
-    for table in results:
-        x = prettytable.PrettyTable(align = "l",
-                                    set_style = prettytable.MSWORD_FRIENDLY,
-                                    hrules = prettytable.HEADER,
-                                    junction_char = '|')
-        
-        lines = table.split('\n')
-        header = [x.strip().replace('<b>', '').replace('</b>', '') for x in lines[0].split('|') if x]
-        header = [split_long_string(x, header = True) for x in header]
-        try:
-            x.field_names = header
-        except Exception as error:
-            my_log.log2(f'tb:replace_tables: {error}')
-            continue
-        for line in lines[2:]:
-            row = [x.strip().replace('<b>', '').replace('</b>', '') for x in line.split('|') if x]
-            row = [split_long_string(x) for x in row]
-            try:
-                x.add_row(row)
-            except Exception as error2:
-                my_log.log2(f'tb:replace_tables: {error2}')
-                continue
-        new_table = x.get_string()
-        text = text.replace(table, f'<pre><code>{new_table}</code></pre>')
-
-    return text
 
 
 def download_image_as_bytes(url: str) -> bytes:

@@ -51,8 +51,6 @@ import my_tts
 import utils
 
 
-
-
 KEYS_DB_FILE = 'db/gemini_keys.pkl'
 USERS_DB_FILE = 'db/gemini_users.pkl'
 
@@ -69,40 +67,46 @@ MESSAGE_QUEUE = {}
 
 class ShowAction(threading.Thread):
     """A thread that can be stopped. Continuously sends a notification of activity to the chat.
-    Telegram automatically turns off the notification after 5 seconds, so it needs to be repeated.
+    Telegram automatically extinguishes the notification after 5 seconds, so it must be repeated.
 
     To use in the code, you need to do something like this:
     with ShowAction(message, 'typing'):
-        do something and while you do the notification does not go out
+        do something and while doing it the notification does not go out
     """
     def __init__(self, message, action):
         """_summary_
 
         Args:
-            chat_id (_type_): id of the chat where the notification will be sent
+            chat_id (_type_): id чата в котором будет отображаться уведомление
             action (_type_):  "typing", "upload_photo", "record_video", "upload_video", "record_audio", 
                               "upload_audio", "upload_document", "find_location", "record_video_note", "upload_video_note"
         """
         super().__init__()
         self.actions = [  "typing", "upload_photo", "record_video", "upload_video", "record_audio",
                          "upload_audio", "upload_document", "find_location", "record_video_note", "upload_video_note"]
-        assert action in self.actions, f'Allowed actions = {self.actions}'
+        assert action in self.actions, f'Допустимые actions = {self.actions}'
         self.chat_id = message.chat.id
         self.thread_id = message.message_thread_id
-        self.is_topic = message.is_topic_message
+        self.is_topic = True if message.is_topic_message else False
         self.action = action
         self.is_running = True
         self.timerseconds = 1
+        self.started_time = time.time()
 
     def run(self):
         while self.is_running:
+            if time.time() - self.started_time > 60*5:
+                self.stop()
+                my_log.log2(f'tb:show_action:stoped after 5min [{self.chat_id}] [{self.thread_id}] is topic: {self.is_topic} action: {self.action}')
+                return
             try:
                 if self.is_topic:
                     bot.send_chat_action(self.chat_id, self.action, message_thread_id = self.thread_id)
                 else:
                     bot.send_chat_action(self.chat_id, self.action)
             except Exception as error:
-                my_log.log2(f'tb:show_action:run: {error}')
+                if 'A request to the Telegram API was unsuccessful. Error code: 429. Description: Too Many Requests' not in str(error):
+                    my_log.log2(f'tb:show_action:run: {error}')
             n = 50
             while n > 0:
                 time.sleep(0.1)
