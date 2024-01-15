@@ -197,65 +197,49 @@ def split_html(text: str, max_length: int = 1500) -> list:
     Raises:
         - AssertionError: If the length of the text is less than or equal to 299.
     """
-
-    if len(text) < 300:
+    if len(text) <= max_length:
         return [text,]
+    def find_all(a_str, sub):
+        start = 0
+        while True:
+            start = a_str.find(sub, start)
+            if start == -1:
+                return
+            if sub.startswith('\n'):
+                yield start+1
+            else:
+                yield start+len(sub)
+            start += len(sub) # use start += 1 to find overlapping matches
 
-    # Find and replace all links (tag <a>) with random words of the same length
-    links = []
-    soup = BeautifulSoup(text, 'html.parser')
-    a_tags = soup.find_all('a')
-    for tag in a_tags:
-        tag = str(tag)
-        random_string = ''.join(random.choice(string.ascii_uppercase+string.ascii_lowercase) for _ in range(len(tag)))
-        links.append((random_string, tag))
-        text = text.replace(tag, random_string)
+    # find all end tags positions with \n after them
+    positions = []
+    # ищем либо открывающий тег в начале, либо закрывающий в конце
+    tags = ['</b>\n','</a>\n','</pre>\n', '</code>\n',
+            '\n<b>', '\n<a>', '\n<pre>', '\n<code>']
 
-    # split text
-    chunks = telebot.util.smart_split(text, max_length)
-    chunks2 = []
-    next_chunk_is_b = False
-    next_chunk_is_code = False
-    # In each piece, check the coincidence of the number of opening and closing tags <b> <code>
-    # and replace the random words back to links
-    for chunk in chunks:
-        for random_string, tag in links:
-            chunk = chunk.replace(random_string, tag)
+    for i in tags:
+        for j in find_all(text, i):
+            positions.append(j)
 
-        b_tags = chunk.count('<b>')
-        b_close_tags = chunk.count('</b>')
-        code_tags = chunk.count('<pre>')
-        code_close_tags = chunk.count('</pre>')
+    chunks = []
 
-        if b_tags > b_close_tags:
-            chunk += '</b>'
-            next_chunk_is_b = True
-        elif b_tags < b_close_tags:
-            chunk = '<b>' + chunk
-            next_chunk_is_b = False
+    # нет ни одной найденной позиции, тупо режем по границе
+    if not positions:
+        chunks.append(text[:max_length])
+        chunks += split_html(text[max_length:], max_length)
+        return chunks
 
-        if code_tags > code_close_tags:
-            chunk += '</pre>'
-            next_chunk_is_code = True
-        elif code_tags < code_close_tags:
-            chunk = '<pre>' + chunk
-            next_chunk_is_code = False
+    for i in list(reversed(positions)):
+        if i < max_length:
+            chunks.append(text[:i])
+            chunks += split_html(text[i:], max_length)
+            return chunks
 
-        # If there are no opening and closing tags <code> and in the previous chunk
-        # a closing tag was added, then this chunk is entirely code
-        if code_close_tags == 0 and code_tags == 0 and next_chunk_is_code:
-            chunk = '<pre>' + chunk
-            chunk += '</pre>'
-
-        # If there are no opening and closing tags <b> and in the previous chunk
-        # a closing tag was added, then this chunk is entirely <b>
-        if b_close_tags == 0 and b_tags == 0 and next_chunk_is_b:
-            chunk = '<b>' + chunk
-            chunk += '</b>'
-
-        chunks2.append(chunk)
-
-    return chunks2
+    # позиции есть но нет такой по которой можно резать,
+    # значит придется резать просто по границе
+    chunks.append(text[:max_length])
+    chunks += split_html(text[max_length:], max_length)
+    return chunks
 
 
 def split_long_string(long_string: str, header = False, MAX_LENGTH = 24) -> str:
