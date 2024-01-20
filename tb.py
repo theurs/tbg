@@ -44,6 +44,7 @@ import time
 
 import telebot
 
+import my_genimg
 import my_gemini
 import my_log
 import my_stt
@@ -52,6 +53,7 @@ import utils
 
 
 KEYS_DB_FILE = 'db/gemini_keys.pkl'
+HFKEYS_DB_FILE = 'db/hugginface_keys.pkl'
 USERS_DB_FILE = 'db/gemini_users.pkl'
 
 bot = telebot.TeleBot(cfg.token, skip_pending=True)
@@ -306,6 +308,78 @@ def handle_voice_thread(message: telebot.types.Message):
             bot.reply_to(message, 'Failed to recognize text')
 
 
+@bot.message_handler(commands=['hfkey'])
+def hf_keys(message: telebot.types.Message):
+    # не обрабатывать команды к другому боту /cmd@botname args
+    if is_for_me(message.text)[0]: message.text = is_for_me(message.text)[1]
+    else: return
+
+    if not authorized(message):
+        return
+
+    try:
+        keys = re.findall("[A-Za-z0-9\-_]{37}", message.text)
+        if keys:
+            cfg.huggin_face_api = keys
+            with open(HFKEYS_DB_FILE, 'wb') as f:
+                pickle.dump(cfg.huggin_face_api, f)
+            bot.reply_to(message, f'Saved {len(keys)} keys')
+    except Exception as error:
+        my_log.log2(f'{error}\n\n{message.text}')
+        bot.reply_to(message, 'Usage: /hfkey <huggin face keys>')
+
+
+@bot.message_handler(commands=['image','img','i', 'imagine'])
+def image(message: telebot.types.Message):
+    thread = threading.Thread(target=image_thread, args=(message,))
+    thread.start()
+def image_thread(message: telebot.types.Message):
+    """Generates a picture from a description"""
+    # не обрабатывать команды к другому боту /cmd@botname args
+    if is_for_me(message.text)[0]: message.text = is_for_me(message.text)[1]
+    else: return
+
+    if not authorized(message):
+        return
+
+    chat_id_full = get_topic_id(message)
+
+    prompt = message.text.split(maxsplit = 1)
+
+    if len(prompt) > 1:
+        prompt = prompt[1]
+        with ShowAction(message, 'upload_photo'):
+
+            images = my_genimg.gen_images(prompt)
+
+            medias = []
+
+            for i in images:
+                d = None
+                caption_ = prompt
+                if isinstance(i, bytes):
+                    d = i
+                if d:
+                    try:
+                        medias.append(telebot.types.InputMediaPhoto(d, caption = caption_))
+                    except Exception as add_media_error:
+                        my_log.log2(f'tb:image_thread:add_media_bytes: {add_media_error}')
+
+            if len(medias) > 0:
+                bot.send_media_group(message.chat.id, medias, reply_to_message_id=message.message_id)
+                my_gemini.update_mem(f'user asked to draw\n{prompt}',
+                                     'drew using DALL-E',
+                                     chat_id_full)
+            else:
+                bot.reply_to(message, 'Could not draw anything. Maybe there is no mood, or maybe you need to give another description.')
+                my_gemini.update_mem(f'user asked to draw\n{prompt}',
+                                      'did not want or could not draw this using DALL-E',
+                                       chat_id_full)
+    else:
+        help = '/image Text description of the picture, what to draw.'
+        bot.reply_to(message, help)
+
+
 @bot.message_handler(content_types = ['photo'])
 def handle_photo(message: telebot.types.Message):
     if authorized(message):
@@ -462,10 +536,12 @@ You can send pictures with questions to the bot, start question with "?" in grou
 Commands:
 /reset - clear history
 /tts <lang> <text to say>
+/img <prompt> - generate an image
 /mem - show your history
 
 /proxy - show found proxies
 /key <keys> - set gemini keys
+/hfkey <keys> - set huggin face keys for image generation
 /users <whitespace separated users id> - set authorized users
 '''
     if cfg.tts_button:
@@ -704,9 +780,20 @@ if __name__ == '__main__':
     try:
         with open(KEYS_DB_FILE, 'rb') as f:
             cfg.gemini_keys = pickle.load(f)
+    except Exception as load_keys_error:
+        my_log.log2(f'tb:load_keys_error: {load_keys_error} {KEYS_DB_FILE}')
+
+    try:
         with open(USERS_DB_FILE, 'rb') as f:
             cfg.users = pickle.load(f)
     except Exception as load_keys_error:
-        my_log.log2(f'tb:load_keys_error: {load_keys_error} {KEYS_DB_FILE}')
+        my_log.log2(f'tb:load_keys_error: {load_keys_error} {USERS_DB_FILE}')
+
+    try:
+        with open(HFKEYS_DB_FILE, 'rb') as f:
+            cfg.huggin_face_api = pickle.load(f)
+    except Exception as load_keys_error:
+        my_log.log2(f'tb:load_keys_error: {load_keys_error} {HFKEYS_DB_FILE}')
+
     my_gemini.run_proxy_pool_daemon()
     bot.polling(timeout=90, long_polling_timeout=90)

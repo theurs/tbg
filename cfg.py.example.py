@@ -25,3 +25,6 @@ bot_name = 'bot'
 
 # show tts button in answers
 tts_button = True
+
+# api token for huggin face
+# cfg.huggin_face_api = []

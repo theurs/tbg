@@ -2,6 +2,8 @@ asyncio
 bs4
 # gTTS
 edge_tts
+langcodes[data]
+langdetect
 lingua-language-detector
 prettytable
 Proxy-List-Scrapper

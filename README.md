@@ -9,7 +9,7 @@ Gemini Pro AI telegram bot [python]
 
 • Answers questions about images when users send photos
 
-![example1](imgs/1.png) ![example1](imgs/2.png) ![example1](imgs/3.png)
+![example1](imgs/1.png) ![example2](imgs/2.png) ![example3](imgs/3.png) ![example4](imgs/4.png)
 
 # Install
 
@@ -32,11 +32,13 @@ sudo apt install ffmpeg
 2. Get telegram bot token from @BotFather.
 3. Set up cfg.py, see example.
 4. Run bot ./tb.py or with systemd service (see example)
+5. Get api token key from https://huggingface.co/
 
 In windows download and install ffmpeg from https://ffmpeg.org/download.html
 1. Download and run EXE file with telegram bot token as argument https://disk.yandex.ru/d/3sls5cDqVqaSrA
 2. Set keys with /key command
 3. Set users with /users command
+4. Set hugging face keys with /hfkey command
 
 # Report issues
 
