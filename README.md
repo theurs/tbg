@@ -32,13 +32,13 @@ sudo apt install ffmpeg
 2. Get telegram bot token from @BotFather.
 3. Set up cfg.py, see example.
 4. Run bot ./tb.py or with systemd service (see example)
-5. Get api token key from https://huggingface.co/
+5. [Optional] Get api token key from https://huggingface.co/
 
 In windows download and install ffmpeg from https://ffmpeg.org/download.html
 1. Download and run EXE file with telegram bot token as argument https://disk.yandex.ru/d/8rtqWG5zE9xV8w
 2. Set keys with /key command
 3. Set users with /users command
-4. Set hugging face keys with /hfkey command
+4. [Optional] Set hugging face keys with /hfkey command
 
 # Report issues
 
