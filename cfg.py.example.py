@@ -27,4 +27,4 @@ bot_name = 'bot'
 tts_button = True
 
 # api token for huggin face
-# cfg.huggin_face_api = []
+# cfg.huggin_face_api = ['hf_xxx','hf_yyy',]
