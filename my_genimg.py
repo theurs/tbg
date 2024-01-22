@@ -31,8 +31,6 @@ def translate_prompt_to_en(prompt: str) -> str:
     detected_lang = langdetect.detect(prompt)
     if detected_lang != 'en':
         prompt_translated = my_gemini.translate(prompt, to_lang='en', help='This is a prompt for image generation. Users can write it in their own language, but only English is supported.')
-        if not prompt_translated:
-            prompt_translated = my_trans.translate_text2(prompt, 'en')
         if prompt_translated:
             prompt = prompt_translated
     return prompt
