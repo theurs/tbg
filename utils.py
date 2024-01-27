@@ -120,6 +120,24 @@ def replace_code_lang(t: str) -> str:
     return result
 
 
+def split_text(text: str, chunk_limit: int = 1500):
+    """ Splits one string into multiple strings, with a maximum amount of chars_per_string
+        characters per string. This is very useful for splitting one giant message into multiples.
+        If chars_per_string > 4096: chars_per_string = 4096. Splits by '\n', '. ' or ' ' in exactly
+        this priority.
+
+        :param text: The text to split
+        :type text: str
+
+        :param chars_per_string: The number of maximum characters per part the text is split to.
+        :type chars_per_string: int
+
+        :return: The splitted text as a list of strings.
+        :rtype: list of str
+    """
+    return telebot.util.smart_split(text, chunk_limit)
+
+
 def replace_tables(text: str) -> str:
     text += '\n'
     state = 0
@@ -164,82 +182,74 @@ def replace_tables(text: str) -> str:
     return text
 
 
-def split_text(text: str, chunk_limit: int = 1500):
-    """ Splits one string into multiple strings, with a maximum amount of chars_per_string
-        characters per string. This is very useful for splitting one giant message into multiples.
-        If chars_per_string > 4096: chars_per_string = 4096. Splits by '\n', '. ' or ' ' in exactly
-        this priority.
-
-        :param text: The text to split
-        :type text: str
-
-        :param chars_per_string: The number of maximum characters per part the text is split to.
-        :type chars_per_string: int
-
-        :return: The splitted text as a list of strings.
-        :rtype: list of str
-    """
-    return telebot.util.smart_split(text, chunk_limit)
-
-
 def split_html(text: str, max_length: int = 1500) -> list:
     """
-    Split the given HTML text into chunks of maximum length, while preserving the integrity
-    of HTML tags. The function takes two arguments:
-    
+    Split the given HTML text into chunks of maximum length specified by `max_length`.
+
     Parameters:
-        - text (str): The HTML text to be split.
-        - max_length (int): The maximum length of each chunk. Default is 1500.
-        
+        text (str): The HTML text to be split into chunks.
+        max_length (int, optional): The maximum length of each chunk. Defaults to 1500.
+
     Returns:
-        - list: A list of chunks, where each chunk is a part of the original text.
-        
-    Raises:
-        - AssertionError: If the length of the text is less than or equal to 299.
+        list: A list of chunks, where each chunk is a string.
     """
-    if len(text) <= max_length:
-        return [text,]
-    def find_all(a_str, sub):
-        start = 0
-        while True:
-            start = a_str.find(sub, start)
-            if start == -1:
-                return
-            if sub.startswith('\n'):
-                yield start+1
-            else:
-                yield start+len(sub)
-            start += len(sub) # use start += 1 to find overlapping matches
-
-    # find all end tags positions with \n after them
-    positions = []
-    # ищем либо открывающий тег в начале, либо закрывающий в конце
-    tags = ['</b>\n','</a>\n','</pre>\n', '</code>\n',
-            '\n<b>', '\n<a>', '\n<pre>', '\n<code>']
-
-    for i in tags:
-        for j in find_all(text, i):
-            positions.append(j)
+    code_tag = ''
+    in_code_mode = 0
 
     chunks = []
+    chunk = ''
 
-    # нет ни одной найденной позиции, тупо режем по границе
-    if not positions:
-        chunks.append(text[:max_length])
-        chunks += split_html(text[max_length:], max_length)
-        return chunks
+    for line in text.split('\n'):
+        if line.startswith('<pre><code') and line.find('</code></pre>') == -1:
+            in_code_mode = 1
+            code_tag = line[:line.find('>', 10) + 1]
 
-    for i in list(reversed(positions)):
-        if i < max_length:
-            chunks.append(text[:i])
-            chunks += split_html(text[i:], max_length)
-            return chunks
+        elif line.startswith('<code>') and line.find('</code>') == -1:
+            in_code_mode = 2
+            code_tag = '<code>'
 
-    # позиции есть но нет такой по которой можно резать,
-    # значит придется резать просто по границе
-    chunks.append(text[:max_length])
-    chunks += split_html(text[max_length:], max_length)
-    return chunks
+        elif line.startswith('<b>') and line.find('</b>') == -1:
+            in_code_mode = 3
+            code_tag = '<b>'
+
+        elif line == '</code></pre>' or line == '</code>' or line == '</b>':
+            code_tag = ''
+            in_code_mode = 0
+
+        else:
+            if len(chunk) + len(line) + 20 > max_length:
+
+                if in_code_mode == 1:
+                    chunk += '</code></pre>\n'
+                    chunks.append(chunk)
+                    chunk = code_tag
+
+                if in_code_mode == 2:
+                    chunk += '</code>\n'
+                    chunks.append(chunk)
+                    chunk = code_tag
+
+                if in_code_mode == 3:
+                    chunk += '</b>\n'
+                    chunks.append(chunk)
+                    chunk = code_tag
+
+                elif in_code_mode == 0:
+                    chunks.append(chunk)
+                    chunk = ''
+
+        chunk += line + '\n'
+
+    chunks.append(chunk)
+
+    chunks2 = []
+    for chunk in chunks:
+        if len(chunk) > max_length:
+            chunks2 += split_text(chunk, max_length)
+        else:
+            chunks2.append(chunk)
+
+    return chunks2
 
 
 def split_long_string(long_string: str, header = False, MAX_LENGTH = 24) -> str:
