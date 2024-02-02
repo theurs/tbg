@@ -1,3 +1,3 @@
-pip install pyinstaller
+@REM pip install pyinstaller
 
 pyinstaller --onefile tb.py

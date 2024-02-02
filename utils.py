@@ -28,17 +28,23 @@ def bot_markdown_to_html(text: str) -> str:
     
     # найти все куски кода между ``` и заменить на хеши
     # спрятать код на время преобразований
-    matches = re.findall('```(.*?)```', text, flags=re.DOTALL)
+    matches = re.findall('```(.*?)```\n', text, flags=re.DOTALL)
     list_of_code_blocks = []
     for match in matches:
-        random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
+        random_string = str(hash(match))
+        list_of_code_blocks.append([match, random_string])
+        text = text.replace(f'```{match}```', random_string)
+
+    matches = re.findall('```(.*?)```', text, flags=re.DOTALL)
+    for match in matches:
+        random_string = str(hash(match))
         list_of_code_blocks.append([match, random_string])
         text = text.replace(f'```{match}```', random_string)
 
     # тут могут быть одиночные поворяющиеся `, меняем их на '
     text = text.replace('```', "'''")
 
-    matches = re.findall('`(.*?)`', text, flags=re.DOTALL)
+    matches = re.findall('`(.*?)`', text)
     list_of_code_blocks2 = []
     for match in matches:
         random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
@@ -86,8 +92,6 @@ def bot_markdown_to_html(text: str) -> str:
         text = text.replace(random_string, f'<code>{new_match}</code>')
 
     text = replace_code_lang(text)
-
-    # text = replace_tables(text)
 
     return text
 
