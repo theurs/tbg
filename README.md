@@ -35,7 +35,7 @@ sudo apt install ffmpeg
 5. [Optional] Get api token key from https://huggingface.co/
 
 In windows download and install ffmpeg from https://ffmpeg.org/download.html
-1. Download and run EXE file with telegram bot token as argument https://disk.yandex.ru/d/AokkbBXTM-Skxw
+1. Download and run EXE file with telegram bot token as argument https://disk.yandex.ru/d/Y2UsesubYWNxFA
 2. Set keys with /key command
 3. Set users with /users command
 4. [Optional] Set hugging face keys with /hfkey command
